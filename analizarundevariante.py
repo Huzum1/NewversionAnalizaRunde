@@ -75,21 +75,24 @@ def calculeaza_statistici_chenar(variante_arr, runde_arr, numar_minim):
     return castiguri, count_2_4, count_3_4, count_4_4, np.array(punctaje_lista)
 
 def aplica_restrictie_diversitate(variante_sortate, max_aparitii):
-    """Aplică restricția de diversitate - fiecare număr apare maxim X ori"""
+    """Aplică restricția de diversitate - fiecare număr apare maxim X ori - FIX COMPLET"""
     counter_numere = Counter()
     variante_filtrate = []
     
     for var in variante_sortate:
-        # Verifică dacă adăugarea acestei variante depășește limita pentru vreun număr
+        # Verifică ÎNAINTE de adăugare dacă oricare număr ar depăși limita
         poate_adauga = True
         
         for num in var['numere']:
-            if counter_numere[num] >= max_aparitii:
+            # Verifică dacă DUPĂ adăugare ar depăși limita
+            if counter_numere[num] + 1 > max_aparitii:
                 poate_adauga = False
                 break
         
+        # Adaugă DOAR dacă respectă limita
         if poate_adauga:
             variante_filtrate.append(var)
+            # Incrementează counter-ul DUPĂ verificare
             for num in var['numere']:
                 counter_numere[num] += 1
         
@@ -413,13 +416,14 @@ if are_runde and are_variante:
         # Sortare inițială
         rezultate_sortate = sorted(rezultate, key=lambda x: (-x['chenare_active'], -x['punctaj_total'], x['sd']))
         
-        # Aplicare restricție diversitate
+        # Aplicare restricție diversitate - FIX APLICAT
         top_100, counter_numere = aplica_restrictie_diversitate(rezultate_sortate, max_aparitii)
     
     st.success(f"✅ TOP {len(top_100)} Variante - Cu diversitate maximă!")
     
-    # Afișare statistici diversitate
-    st.info(f"📊 Numere unice folosite: {len(counter_numere)} din 66 | Distribuție echilibrată: {len([c for c in counter_numere.values() if c <= max_aparitii])} numere respectă limita")
+    # Afișare statistici diversitate - FIX
+    numere_peste_limita = [num for num, count in counter_numere.items() if count > max_aparitii]
+    st.info(f"📊 Numere unice folosite: {len(counter_numere)} din 66 | Maxim apariții găsite: {max(counter_numere.values()) if counter_numere else 0} | Peste limită: {len(numere_peste_limita)} numere")
     
     st.divider()
     
