@@ -48,6 +48,27 @@ for i in range(4):
     with cols_rand1[i]:
         st.subheader(f"Chenar {i+1}")
         
+        # Upload file
+        uploaded_file = st.file_uploader(f"Import .txt", type=['txt'], key=f"upload_{i}")
+        
+        if uploaded_file is not None:
+            content = uploaded_file.read().decode('utf-8')
+            linii = content.strip().split('\n')
+            runde_noi = []
+            
+            for linie in linii:
+                try:
+                    numere = [int(n.strip()) for n in linie.split(',') if n.strip()]
+                    if numere:
+                        runde_noi.append(numere)
+                except:
+                    pass
+            
+            if runde_noi:
+                st.session_state.runde_chenare[i] = runde_noi
+                st.success(f"✅ {len(runde_noi)} runde")
+                st.rerun()
+        
         text_runde = st.text_area(
             "Format: 1,6,7,9,44,77",
             height=100,
@@ -94,6 +115,27 @@ for i in range(3):
     idx = i + 4
     with cols_rand2[i]:
         st.subheader(f"Chenar {idx+1}")
+        
+        # Upload file
+        uploaded_file = st.file_uploader(f"Import .txt", type=['txt'], key=f"upload_{idx}")
+        
+        if uploaded_file is not None:
+            content = uploaded_file.read().decode('utf-8')
+            linii = content.strip().split('\n')
+            runde_noi = []
+            
+            for linie in linii:
+                try:
+                    numere = [int(n.strip()) for n in linie.split(',') if n.strip()]
+                    if numere:
+                        runde_noi.append(numere)
+                except:
+                    pass
+            
+            if runde_noi:
+                st.session_state.runde_chenare[idx] = runde_noi
+                st.success(f"✅ {len(runde_noi)} runde")
+                st.rerun()
         
         text_runde = st.text_area(
             "Format: 1,6,7,9,44,77",
