@@ -21,6 +21,8 @@ if 'runde_chenare' not in st.session_state:
     st.session_state.runde_chenare = [[] for _ in range(7)]
 if 'variante' not in st.session_state:
     st.session_state.variante = []
+if 'variante_filtrate_finale' not in st.session_state:
+    st.session_state.variante_filtrate_finale = []
 
 # Funcții Numba pentru viteză maximă
 @jit(nopython=True)
@@ -75,29 +77,47 @@ def calculeaza_statistici_chenar(variante_arr, runde_arr, numar_minim):
     return castiguri, count_2_4, count_3_4, count_4_4, np.array(punctaje_lista)
 
 def aplica_restrictie_diversitate(variante_sortate, max_aparitii):
-    """Aplică restricția de diversitate - fiecare număr apare maxim X ori - FIX COMPLET"""
+    """Aplică restricția de diversitate - fiecare număr apare maxim X ori"""
     counter_numere = Counter()
     variante_filtrate = []
     
     for var in variante_sortate:
-        # Verifică ÎNAINTE de adăugare dacă oricare număr ar depăși limita
         poate_adauga = True
         
         for num in var['numere']:
-            # Verifică dacă DUPĂ adăugare ar depăși limita
             if counter_numere[num] + 1 > max_aparitii:
                 poate_adauga = False
                 break
         
-        # Adaugă DOAR dacă respectă limita
         if poate_adauga:
             variante_filtrate.append(var)
-            # Incrementează counter-ul DUPĂ verificare
             for num in var['numere']:
                 counter_numere[num] += 1
         
-        # Oprește când ajungem la 100
         if len(variante_filtrate) >= 100:
+            break
+    
+    return variante_filtrate, counter_numere
+
+def filtrare_variante_finale(toate_variantele, max_aparitii_finale, target_count):
+    """Filtrează un set mare de variante la un număr țintă cu restricție de apariții"""
+    counter_numere = Counter()
+    variante_filtrate = []
+    
+    for var in toate_variantele:
+        poate_adauga = True
+        
+        for num in var['numere']:
+            if counter_numere[num] + 1 > max_aparitii_finale:
+                poate_adauga = False
+                break
+        
+        if poate_adauga:
+            variante_filtrate.append(var)
+            for num in var['numere']:
+                counter_numere[num] += 1
+        
+        if len(variante_filtrate) >= target_count:
             break
     
     return variante_filtrate, counter_numere
@@ -111,7 +131,6 @@ for i in range(4):
     with cols_rand1[i]:
         st.subheader(f"Chenar {i+1}")
         
-        # Upload file
         uploaded_file = st.file_uploader(f"Import .txt", type=['txt'], key=f"upload_{i}")
         
         if uploaded_file is not None:
@@ -179,7 +198,6 @@ for i in range(3):
     with cols_rand2[i]:
         st.subheader(f"Chenar {idx+1}")
         
-        # Upload file
         uploaded_file = st.file_uploader(f"Import .txt", type=['txt'], key=f"upload_{idx}")
         
         if uploaded_file is not None:
@@ -318,7 +336,6 @@ if are_runde and are_variante:
     
     cols_stats = st.columns(7)
     
-    # Pregătire date pentru Numba
     variante_arr = np.array([var['numere'] for var in st.session_state.variante], dtype=np.int64)
     
     for i in range(7):
@@ -356,18 +373,16 @@ if are_runde and are_variante:
     # SECȚIUNEA 2 - TOP 100 STABILITATE
     st.header("💎 Secțiunea 2 - TOP 100 Stabilitate")
     
-    # SLIDER DIVERSITATE
     max_aparitii = st.slider(
         "🎯 Maxim apariții per număr în TOP 100:",
         min_value=1,
         max_value=20,
-        value=5,
-        help="Fiecare număr poate apărea maxim de atâtea ori în cele 100 variante. Valoare mai mică = diversitate mai mare."
+        value=10,
+        help="Fiecare număr poate apărea maxim de atâtea ori în cele 100 variante."
     )
     
     st.divider()
     
-    # Calculare punctaje pentru toate variantele
     with st.spinner('Calculare TOP 100...'):
         rezultate = []
         
@@ -413,15 +428,11 @@ if are_runde and are_variante:
                 'punctaje_per_chenar': punctaje_per_chenar
             })
         
-        # Sortare inițială
         rezultate_sortate = sorted(rezultate, key=lambda x: (-x['chenare_active'], -x['punctaj_total'], x['sd']))
-        
-        # Aplicare restricție diversitate - FIX APLICAT
         top_100, counter_numere = aplica_restrictie_diversitate(rezultate_sortate, max_aparitii)
     
     st.success(f"✅ TOP {len(top_100)} Variante - Cu diversitate maximă!")
     
-    # Afișare statistici diversitate - FIX
     numere_peste_limita = [num for num, count in counter_numere.items() if count > max_aparitii]
     st.info(f"📊 Numere unice folosite: {len(counter_numere)} din 66 | Maxim apariții găsite: {max(counter_numere.values()) if counter_numere else 0} | Peste limită: {len(numere_peste_limita)} numere")
     
@@ -458,7 +469,6 @@ if are_runde and are_variante:
     # FORMAT 1 - TABEL DETALIAT
     st.subheader("📋 Format 1 - Tabel Detaliat")
     
-    # Header
     col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7 = st.columns([1, 2, 4, 2, 2, 2, 2])
     with col_h1:
         st.markdown("**#**")
@@ -480,7 +490,6 @@ if are_runde and are_variante:
     tabel_container = st.container(height=400)
     with tabel_container:
         for idx, item in enumerate(top_100, 1):
-            # Badges
             badge = ""
             if item['sd'] < 50.0:
                 badge += "⭐ "
@@ -529,3 +538,121 @@ if are_runde and are_variante:
 
 else:
     st.info("Adaugă runde și variante pentru verificare")
+
+st.divider()
+
+# SECȚIUNEA 3 - FILTRARE FINALĂ VARIANTE
+st.header("🔬 Secțiunea 3 - Filtrare Finală Variante")
+
+st.markdown("""
+**Folosire:** Adaugă un set mare de variante (ex: 2000) și filtrează-le la un număr țintă (ex: 1000) cu restricție de apariții.
+""")
+
+text_variante_finale = st.text_area(
+    "Paste variante pentru filtrare (format: ID, numere separate prin spațiu):",
+    height=200,
+    placeholder="1, 5 12 34 56\n2, 3 15 42 89\n...",
+    key="input_variante_finale"
+)
+
+col_f1, col_f2, col_f3 = st.columns(3)
+
+with col_f1:
+    max_aparitii_finale = st.number_input(
+        "Maxim apariții per număr:",
+        min_value=1,
+        max_value=50,
+        value=10,
+        help="Fiecare număr poate apărea maxim de atâtea ori în setul final."
+    )
+
+with col_f2:
+    target_variante = st.number_input(
+        "Câte variante să păstrezi:",
+        min_value=1,
+        max_value=10000,
+        value=1000,
+        help="Numărul de variante finale după filtrare."
+    )
+
+with col_f3:
+    if st.button("🎯 Filtrează Variante", type="primary", use_container_width=True):
+        if text_variante_finale.strip():
+            with st.spinner('Filtrare în curs...'):
+                linii = text_variante_finale.strip().split('\n')
+                variante_input = []
+                
+                for linie in linii:
+                    try:
+                        parti = linie.split(',', 1)
+                        if len(parti) == 2:
+                            id_var = parti[0].strip()
+                            numere_str = parti[1].strip()
+                            numere = [int(n.strip()) for n in numere_str.split() if n.strip()]
+                            if numere:
+                                variante_input.append({
+                                    'id': id_var,
+                                    'numere': numere
+                                })
+                    except:
+                        pass
+                
+                if variante_input:
+                    variante_filtrate, counter_finale = filtrare_variante_finale(
+                        variante_input,
+                        max_aparitii_finale,
+                        target_variante
+                    )
+                    
+                    st.session_state.variante_filtrate_finale = variante_filtrate
+                    
+                    st.success(f"✅ Filtrat: {len(variante_input)} → {len(variante_filtrate)} variante!")
+                    st.info(f"📊 Numere unice: {len(counter_finale)} | Max apariții: {max(counter_finale.values()) if counter_finale else 0}")
+                else:
+                    st.error("Nu s-au putut procesa variante. Verifică formatul.")
+        else:
+            st.warning("Adaugă variante pentru filtrare.")
+
+if st.session_state.variante_filtrate_finale:
+    st.divider()
+    
+    st.subheader("📋 Rezultat Filtrare")
+    
+    # Analiză distribuție
+    counter_distributie = Counter()
+    for var in st.session_state.variante_filtrate_finale:
+        for num in var['numere']:
+            counter_distributie[num] += 1
+    
+    col_a1, col_a2, col_a3 = st.columns(3)
+    with col_a1:
+        st.metric("Variante finale", len(st.session_state.variante_filtrate_finale))
+    with col_a2:
+        st.metric("Numere unice", len(counter_distributie))
+    with col_a3:
+        st.metric("Acoperire", f"{len(counter_distributie)/66*100:.1f}%")
+    
+    st.divider()
+    
+    # Copy-paste format
+    st.subheader("📝 Variante Filtrate - Copy-Paste")
+    
+    copy_text_filtrat = ""
+    for item in st.session_state.variante_filtrate_finale:
+        copy_text_filtrat += f"{item['id']}, {' '.join(map(str, item['numere']))}\n"
+    
+    st.text_area(
+        "Variante finale:",
+        value=copy_text_filtrat,
+        height=400,
+        key="copy_paste_filtrate"
+    )
+    
+    # Analiză distribuție detaliată
+    with st.expander("📊 Analiză Distribuție Numere"):
+        df_distributie = pd.DataFrame([
+            {"Număr": num, "Apariții": count}
+            for num, count in sorted(counter_distributie.items())
+        ])
+        
+        st.dataframe(df_distributie, use_container_width=True, height=400)
