@@ -362,7 +362,8 @@ if are_runde and are_variante:
                 if are_potriviri:
                     chenare_active += 1
             
-            if chenare_active >= 5:
+            # MODIFICARE: Acceptă ORICE variantă care are punctaj > 0
+            if punctaj_total > 0:
                 sd = np.std(punctaje_per_chenar)
                 
                 rezultate.append({
@@ -377,20 +378,25 @@ if are_runde and are_variante:
         # Sortare
         top_100 = sorted(rezultate, key=lambda x: (-x['chenare_active'], -x['punctaj_total'], x['sd']))[:100]
     
+    # DEBUG
+    st.info(f"DEBUG: Total variante procesate: {len(rezultate)} | TOP 100: {len(top_100)}")
+    
     if top_100:
         # FILTRARE DINAMICĂ
         st.subheader("🎛️ Filtrare Dinamică")
         
         col_f1, col_f2, col_f3 = st.columns(3)
         
+        max_chenare_disponibile = max([x['chenare_active'] for x in top_100])
+        
         with col_f1:
-            min_chenare = st.slider("Minim chenare active:", 5, 7, 5, key="filter_chenare")
+            min_chenare = st.slider("Minim chenare active:", 1, max_chenare_disponibile, 1, key="filter_chenare")
         
         with col_f2:
             min_punctaj = st.slider("Punctaj minim total:", 0, int(max([x['punctaj_total'] for x in top_100])), 0, key="filter_punctaj")
         
         with col_f3:
-            max_sd = st.slider("SD maxim acceptat:", 0.0, 10.0, 10.0, 0.1, key="filter_sd")
+            max_sd = st.slider("SD maxim acceptat:", 0.0, 20.0, 20.0, 0.1, key="filter_sd")
         
         # Aplicare filtre
         top_100_filtrat = [
