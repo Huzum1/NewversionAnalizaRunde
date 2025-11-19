@@ -327,7 +327,7 @@ if are_runde and are_variante:
     # SECȚIUNEA 2 - TOP 100 STABILITATE
     st.header("💎 Secțiunea 2 - TOP 100 Stabilitate")
     
-    # Calculare punctaje pentru toate variantele cu progress bar
+    # Calculare punctaje pentru toate variantele
     with st.spinner('Calculare TOP 100...'):
         rezultate = []
         
@@ -362,7 +362,7 @@ if are_runde and are_variante:
                 if are_potriviri:
                     chenare_active += 1
             
-            # MODIFICARE: Acceptă ORICE variantă care are punctaj > 0
+            # Acceptă ORICE variantă care are punctaj > 0
             if punctaj_total > 0:
                 sd = np.std(punctaje_per_chenar)
                 
@@ -378,22 +378,22 @@ if are_runde and are_variante:
         # Sortare
         top_100 = sorted(rezultate, key=lambda x: (-x['chenare_active'], -x['punctaj_total'], x['sd']))[:100]
     
-    # DEBUG
-    st.info(f"DEBUG: Total variante procesate: {len(rezultate)} | TOP 100: {len(top_100)}")
-    
     if top_100:
+        st.success(f"✅ Găsite {len(top_100)} variante în TOP 100!")
+        
         # FILTRARE DINAMICĂ
         st.subheader("🎛️ Filtrare Dinamică")
         
         col_f1, col_f2, col_f3 = st.columns(3)
         
         max_chenare_disponibile = max([x['chenare_active'] for x in top_100])
+        max_punctaj_disponibil = int(max([x['punctaj_total'] for x in top_100]))
         
         with col_f1:
             min_chenare = st.slider("Minim chenare active:", 1, max_chenare_disponibile, 1, key="filter_chenare")
         
         with col_f2:
-            min_punctaj = st.slider("Punctaj minim total:", 0, int(max([x['punctaj_total'] for x in top_100])), 0, key="filter_punctaj")
+            min_punctaj = st.slider("Punctaj minim total:", 0, max_punctaj_disponibil, 0, key="filter_punctaj")
         
         with col_f3:
             max_sd = st.slider("SD maxim acceptat:", 0.0, 20.0, 20.0, 0.1, key="filter_sd")
@@ -417,7 +417,9 @@ if are_runde and are_variante:
             heatmap_data = []
             labels_y = []
             
-            for idx, item in enumerate(top_100_filtrat[:20], 1):
+            display_count = min(20, len(top_100_filtrat))
+            
+            for idx, item in enumerate(top_100_filtrat[:display_count], 1):
                 heatmap_data.append(item['punctaje_per_chenar'])
                 labels_y.append(f"#{idx} ID:{item['id']}")
             
@@ -440,59 +442,83 @@ if are_runde and are_variante:
         # FORMAT 1 - TABEL DETALIAT
         st.subheader("📋 Format 1 - Tabel Detaliat")
         
-        tabel_container = st.container(height=400)
-        with tabel_container:
-            for idx, item in enumerate(top_100_filtrat, 1):
-                badge = ""
-                if item['sd'] < 2.0:
-                    badge += "⭐ "
-                if item['chenare_active'] == 7:
-                    badge += "🎯 "
-                if item['punctaj_total'] == max([x['punctaj_total'] for x in top_100_filtrat]):
-                    badge += "🏆 "
-                
-                col_t1, col_t2, col_t3, col_t4, col_t5, col_t6, col_t7 = st.columns([1, 2, 4, 2, 2, 2, 2])
-                
-                with col_t1:
-                    st.text(f"#{idx}")
-                with col_t2:
-                    st.text(f"ID {item['id']}")
-                with col_t3:
-                    st.text(' '.join(map(str, item['numere'])))
-                with col_t4:
-                    st.text(f"{item['punctaj_total']}")
-                with col_t5:
-                    st.text(f"{item['chenare_active']}/7")
-                with col_t6:
-                    st.text(f"{item['sd']:.2f}")
-                with col_t7:
-                    with st.expander("👁️"):
-                        for i, punctaj in enumerate(item['punctaje_per_chenar'], 1):
-                            st.text(f"Chenar {i}: {punctaj} puncte")
-                
-                if badge:
-                    st.caption(badge)
-                
-                st.divider()
+        if len(top_100_filtrat) > 0:
+            # Header
+            col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7 = st.columns([1, 2, 4, 2, 2, 2, 2])
+            with col_h1:
+                st.markdown("**#**")
+            with col_h2:
+                st.markdown("**ID**")
+            with col_h3:
+                st.markdown("**Numere**")
+            with col_h4:
+                st.markdown("**Punctaj**")
+            with col_h5:
+                st.markdown("**Chenare**")
+            with col_h6:
+                st.markdown("**SD**")
+            with col_h7:
+                st.markdown("**Detalii**")
+            
+            st.divider()
+            
+            tabel_container = st.container(height=400)
+            with tabel_container:
+                for idx, item in enumerate(top_100_filtrat, 1):
+                    badge = ""
+                    if item['sd'] < 2.0:
+                        badge += "⭐ "
+                    if item['chenare_active'] == 7:
+                        badge += "🎯 "
+                    if item['punctaj_total'] == max([x['punctaj_total'] for x in top_100_filtrat]):
+                        badge += "🏆 "
+                    
+                    col_t1, col_t2, col_t3, col_t4, col_t5, col_t6, col_t7 = st.columns([1, 2, 4, 2, 2, 2, 2])
+                    
+                    with col_t1:
+                        st.text(f"#{idx}")
+                    with col_t2:
+                        st.text(f"ID {item['id']}")
+                    with col_t3:
+                        st.text(' '.join(map(str, item['numere'])))
+                    with col_t4:
+                        st.text(f"{item['punctaj_total']}")
+                    with col_t5:
+                        st.text(f"{item['chenare_active']}/7")
+                    with col_t6:
+                        st.text(f"{item['sd']:.2f}")
+                    with col_t7:
+                        with st.expander("👁️"):
+                            for i, punctaj in enumerate(item['punctaje_per_chenar'], 1):
+                                st.text(f"Chenar {i}: {punctaj} puncte")
+                    
+                    if badge:
+                        st.caption(badge)
+        else:
+            st.info("Nu există variante după aplicarea filtrelor")
         
         st.divider()
         
         # FORMAT 2 - COPY-PASTE
         st.subheader("📝 Format 2 - Copy-Paste")
         
-        copy_text = ""
-        for item in top_100_filtrat:
-            copy_text += f"{item['id']}, {' '.join(map(str, item['numere']))}\n"
-        
-        st.text_area(
-            "Copy-paste:",
-            value=copy_text,
-            height=300,
-            key="copy_paste_area"
-        )
+        if len(top_100_filtrat) > 0:
+            copy_text = ""
+            for item in top_100_filtrat:
+                copy_text += f"{item['id']}, {' '.join(map(str, item['numere']))}\n"
+            
+            st.text_area(
+                "Copy-paste:",
+                value=copy_text,
+                height=300,
+                key="copy_paste_area"
+            )
+        else:
+            st.info("Nu există variante de copiat")
     
     else:
-        st.info("Nu există variante care îndeplinesc criteriile pentru TOP 100")
+        st.warning("Nu există variante care îndeplinesc criteriile pentru TOP 100")
+        st.info("Verifică dacă variantele au potriviri în runde. Probabilitatea de 2/4, 3/4, 4/4 în Keno 12/66 este relativ mică.")
 
 else:
     st.info("Adaugă runde și variante pentru verificare")
