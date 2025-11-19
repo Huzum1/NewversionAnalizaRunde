@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 from numba import jit
+from collections import Counter
 
 # Configurare pagină
 st.set_page_config(
@@ -72,6 +73,31 @@ def calculeaza_statistici_chenar(variante_arr, runde_arr, numar_minim):
                     count_2_4 += 1
     
     return castiguri, count_2_4, count_3_4, count_4_4, np.array(punctaje_lista)
+
+def aplica_restrictie_diversitate(variante_sortate, max_aparitii):
+    """Aplică restricția de diversitate - fiecare număr apare maxim X ori"""
+    counter_numere = Counter()
+    variante_filtrate = []
+    
+    for var in variante_sortate:
+        # Verifică dacă adăugarea acestei variante depășește limita pentru vreun număr
+        poate_adauga = True
+        
+        for num in var['numere']:
+            if counter_numere[num] >= max_aparitii:
+                poate_adauga = False
+                break
+        
+        if poate_adauga:
+            variante_filtrate.append(var)
+            for num in var['numere']:
+                counter_numere[num] += 1
+        
+        # Oprește când ajungem la 100
+        if len(variante_filtrate) >= 100:
+            break
+    
+    return variante_filtrate, counter_numere
 
 # SECȚIUNEA RUNDE - 7 CHENARE
 st.header("📋 Runde")
@@ -327,7 +353,18 @@ if are_runde and are_variante:
     # SECȚIUNEA 2 - TOP 100 STABILITATE
     st.header("💎 Secțiunea 2 - TOP 100 Stabilitate")
     
-    # Calculare punctaje pentru toate variantele - FĂRĂ RESTRICȚII
+    # SLIDER DIVERSITATE
+    max_aparitii = st.slider(
+        "🎯 Maxim apariții per număr în TOP 100:",
+        min_value=1,
+        max_value=20,
+        value=10,
+        help="Fiecare număr poate apărea maxim de atâtea ori în cele 100 variante. Valoare mai mică = diversitate mai mare."
+    )
+    
+    st.divider()
+    
+    # Calculare punctaje pentru toate variantele
     with st.spinner('Calculare TOP 100...'):
         rezultate = []
         
@@ -362,7 +399,6 @@ if are_runde and are_variante:
                 if are_potriviri:
                     chenare_active += 1
             
-            # ACCEPTĂ ABSOLUT TOATE VARIANTELE - chiar și cu punctaj 0
             sd = np.std(punctaje_per_chenar)
             
             rezultate.append({
@@ -374,10 +410,16 @@ if are_runde and are_variante:
                 'punctaje_per_chenar': punctaje_per_chenar
             })
         
-        # Sortare: Prioritate 1 = chenare_active DESC, Prioritate 2 = punctaj_total DESC, Prioritate 3 = sd ASC
-        top_100 = sorted(rezultate, key=lambda x: (-x['chenare_active'], -x['punctaj_total'], x['sd']))[:100]
+        # Sortare inițială
+        rezultate_sortate = sorted(rezultate, key=lambda x: (-x['chenare_active'], -x['punctaj_total'], x['sd']))
+        
+        # Aplicare restricție diversitate
+        top_100, counter_numere = aplica_restrictie_diversitate(rezultate_sortate, max_aparitii)
     
-    st.success(f"✅ TOP 100 Variante - Cele mai bune din {len(rezultate)} variante!")
+    st.success(f"✅ TOP {len(top_100)} Variante - Cu diversitate maximă!")
+    
+    # Afișare statistici diversitate
+    st.info(f"📊 Numere unice folosite: {len(counter_numere)} din 66 | Distribuție echilibrată: {len([c for c in counter_numere.values() if c <= max_aparitii])} numere respectă limita")
     
     st.divider()
     
@@ -387,7 +429,9 @@ if are_runde and are_variante:
     heatmap_data = []
     labels_y = []
     
-    for idx, item in enumerate(top_100[:20], 1):
+    display_count = min(20, len(top_100))
+    
+    for idx, item in enumerate(top_100[:display_count], 1):
         heatmap_data.append(item['punctaje_per_chenar'])
         labels_y.append(f"#{idx} ID:{item['id']}")
     
