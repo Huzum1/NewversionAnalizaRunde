@@ -440,7 +440,7 @@ if pagina == "📊 Analiză Runde + Variante":
             "🎯 Maxim apariții per număr în TOP 100:",
             min_value=1,
             max_value=20,
-            value=10,
+            value=5,
             help="Fiecare număr poate apărea maxim de atâtea ori în cele 100 variante."
         )
         
