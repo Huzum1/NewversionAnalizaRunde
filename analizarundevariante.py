@@ -378,6 +378,13 @@ if are_runde and are_variante:
         # Sortare
         top_100 = sorted(rezultate, key=lambda x: (-x['chenare_active'], -x['punctaj_total'], x['sd']))[:100]
     
+    # DEBUG COMPLET
+    st.write(f"🔍 DEBUG:")
+    st.write(f"- Total rezultate: {len(rezultate)}")
+    st.write(f"- TOP 100 lungime: {len(top_100)}")
+    if len(rezultate) > 0:
+        st.write(f"- Primul rezultat: ID={rezultate[0]['id']}, Punctaj={rezultate[0]['punctaj_total']}, Chenare={rezultate[0]['chenare_active']}")
+    
     if top_100:
         st.success(f"✅ Găsite {len(top_100)} variante în TOP 100!")
         
