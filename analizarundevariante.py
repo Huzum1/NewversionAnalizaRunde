@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 from numba import jit
 from collections import Counter
+import os
 
 # Configurare pagină
 st.set_page_config(
@@ -16,13 +17,52 @@ st.set_page_config(
 st.title("🎰 Verificare Variante Loterie")
 st.divider()
 
+# Funcție pentru încărcare automată fișiere runde
+def incarca_runde_automat():
+    """Încarcă automat fișierele 1.txt - 7.txt în chenare"""
+    files_path = "/mnt/user-data/uploads"
+    
+    for i in range(7):
+        file_name = f"{i+1}.txt"
+        file_path = os.path.join(files_path, file_name)
+        
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    linii = content.strip().split('\n')
+                    runde_noi = []
+                    
+                    for linie in linii:
+                        try:
+                            numere = [int(n.strip()) for n in linie.split(',') if n.strip()]
+                            if numere:
+                                runde_noi.append(numere)
+                        except:
+                            pass
+                    
+                    if runde_noi:
+                        st.session_state.runde_chenare[i] = runde_noi
+            except Exception as e:
+                pass
+
 # Inițializare session state
 if 'runde_chenare' not in st.session_state:
     st.session_state.runde_chenare = [[] for _ in range(7)]
+    st.session_state.runde_incarcate_auto = False
+
 if 'variante' not in st.session_state:
     st.session_state.variante = []
+
 if 'variante_filtrate_finale' not in st.session_state:
     st.session_state.variante_filtrate_finale = []
+
+# Încărcare automată la prima rulare
+if not st.session_state.runde_incarcate_auto:
+    incarca_runde_automat()
+    st.session_state.runde_incarcate_auto = True
+    if any(len(runde) > 0 for runde in st.session_state.runde_chenare):
+        st.rerun()
 
 # Funcții Numba pentru viteză maximă
 @jit(nopython=True)
@@ -175,6 +215,17 @@ pagina = st.sidebar.radio(
     ["📊 Analiză Runde + Variante", "🔬 Filtrare Hibrid Variante"],
     index=0
 )
+
+st.sidebar.divider()
+
+# Status runde încărcate
+total_runde_incarcate = sum(len(runde) for runde in st.session_state.runde_chenare)
+chenare_active = sum(1 for runde in st.session_state.runde_chenare if len(runde) > 0)
+
+if total_runde_incarcate > 0:
+    st.sidebar.success(f"✅ Runde: {total_runde_incarcate} în {chenare_active}/7 chenare")
+else:
+    st.sidebar.info("📋 Nicio rundă încărcată")
 
 st.sidebar.divider()
 st.sidebar.info("**Analiză**: Verifică variante pe runde\n\n**Filtrare Hibrid**: Filtrează cu/fără runde")
