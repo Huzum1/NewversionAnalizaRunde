@@ -1,10 +1,9 @@
-import streamlit as st
+
 import pandas as pd
 import numpy as np
 import plotly.express as px
 from numba import jit
 from collections import Counter
-import os
 
 # Configurare pagină
 st.set_page_config(
@@ -17,52 +16,15 @@ st.set_page_config(
 st.title("🎰 Verificare Variante Loterie")
 st.divider()
 
-# Funcție pentru încărcare automată fișiere runde
-def incarca_runde_automat():
-    """Încarcă automat fișierele 1.txt - 7.txt în chenare"""
-    files_path = "/mnt/user-data/uploads"
-    
-    for i in range(7):
-        file_name = f"{i+1}.txt"
-        file_path = os.path.join(files_path, file_name)
-        
-        if os.path.exists(file_path):
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    linii = content.strip().split('\n')
-                    runde_noi = []
-                    
-                    for linie in linii:
-                        try:
-                            numere = [int(n.strip()) for n in linie.split(',') if n.strip()]
-                            if numere:
-                                runde_noi.append(numere)
-                        except:
-                            pass
-                    
-                    if runde_noi:
-                        st.session_state.runde_chenare[i] = runde_noi
-            except Exception as e:
-                pass
-
 # Inițializare session state
 if 'runde_chenare' not in st.session_state:
     st.session_state.runde_chenare = [[] for _ in range(7)]
-    st.session_state.runde_incarcate_auto = False
 
 if 'variante' not in st.session_state:
     st.session_state.variante = []
 
 if 'variante_filtrate_finale' not in st.session_state:
     st.session_state.variante_filtrate_finale = []
-
-# Încărcare automată la prima rulare
-if not st.session_state.runde_incarcate_auto:
-    incarca_runde_automat()
-    st.session_state.runde_incarcate_auto = True
-    if any(len(runde) > 0 for runde in st.session_state.runde_chenare):
-        st.rerun()
 
 # Funcții Numba pentru viteză maximă
 @jit(nopython=True)
@@ -238,6 +200,56 @@ if pagina == "📊 Analiză Runde + Variante":
     
     # SECȚIUNEA RUNDE - 7 CHENARE
     st.header("📋 Runde")
+    
+    # BUTON ÎNCĂRCARE AUTOMATĂ FIȘIERE
+    st.info("💡 **Încarcă rapid:** Folosește butoanele de mai jos pentru a încărca automat fișierele 1.txt - 7.txt în chenare")
+    
+    col_auto1, col_auto2 = st.columns([3, 1])
+    
+    with col_auto1:
+        uploaded_files = st.file_uploader(
+            "📁 Încarcă fișierele 1.txt - 7.txt (selectează toate 7 fișiere)",
+            type=['txt'],
+            accept_multiple_files=True,
+            key="bulk_upload"
+        )
+    
+    with col_auto2:
+        st.write("")
+        st.write("")
+        if st.button("🚀 Încarcă în chenare", type="primary", use_container_width=True):
+            if uploaded_files and len(uploaded_files) > 0:
+                # Sortează fișierele după nume (1.txt, 2.txt, etc.)
+                sorted_files = sorted(uploaded_files, key=lambda x: x.name)
+                
+                incarcate = 0
+                for idx, uploaded_file in enumerate(sorted_files):
+                    if idx >= 7:  # Max 7 chenare
+                        break
+                    
+                    content = uploaded_file.read().decode('utf-8')
+                    linii = content.strip().split('\n')
+                    runde_noi = []
+                    
+                    for linie in linii:
+                        try:
+                            numere = [int(n.strip()) for n in linie.split(',') if n.strip()]
+                            if numere:
+                                runde_noi.append(numere)
+                        except:
+                            pass
+                    
+                    if runde_noi:
+                        st.session_state.runde_chenare[idx] = runde_noi
+                        incarcate += 1
+                
+                if incarcate > 0:
+                    st.success(f"✅ Încărcate {incarcate} fișiere în chenare!")
+                    st.rerun()
+            else:
+                st.warning("⚠️ Selectează fișierele mai întâi!")
+    
+    st.divider()
     
     # Primul rând - 4 chenare
     cols_rand1 = st.columns(4)
