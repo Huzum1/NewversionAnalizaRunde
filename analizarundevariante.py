@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+from numba import jit
 
 # Configurare pagină
 st.set_page_config(
@@ -20,16 +21,20 @@ if 'runde_chenare' not in st.session_state:
 if 'variante' not in st.session_state:
     st.session_state.variante = []
 
-# Funcție pentru comparare numere
-@st.cache_data
-def verifica_varianta(varianta, runda):
+# Funcții Numba pentru viteză maximă
+@jit(nopython=True)
+def verifica_varianta_numba(varianta, runda):
     """Verifică câte numere se potrivesc între variantă și rundă"""
-    set_varianta = set(varianta)
-    set_runda = set(runda)
-    return len(set_varianta.intersection(set_runda))
+    count = 0
+    for v in varianta:
+        for r in runda:
+            if v == r:
+                count += 1
+                break
+    return count
 
-@st.cache_data
-def calculeaza_punctaj(potriviri):
+@jit(nopython=True)
+def calculeaza_punctaj_numba(potriviri):
     """Calculează punctaj bazat pe potriviri"""
     if potriviri == 2:
         return 5
@@ -38,6 +43,35 @@ def calculeaza_punctaj(potriviri):
     elif potriviri == 4:
         return 10
     return 0
+
+@jit(nopython=True)
+def calculeaza_statistici_chenar(variante_arr, runde_arr, numar_minim):
+    """Calculează statistici pentru un chenar"""
+    castiguri = 0
+    count_2_4 = 0
+    count_3_4 = 0
+    count_4_4 = 0
+    punctaje_lista = []
+    
+    for runda in runde_arr:
+        for varianta in variante_arr:
+            potriviri = verifica_varianta_numba(varianta, runda)
+            
+            if potriviri >= numar_minim:
+                castiguri += 1
+            
+            punctaj = calculeaza_punctaj_numba(potriviri)
+            if punctaj > 0:
+                punctaje_lista.append(punctaj)
+                
+                if potriviri == 4:
+                    count_4_4 += 1
+                elif potriviri == 3:
+                    count_3_4 += 1
+                elif potriviri == 2:
+                    count_2_4 += 1
+    
+    return castiguri, count_2_4, count_3_4, count_4_4, np.array(punctaje_lista)
 
 # SECȚIUNEA RUNDE - 7 CHENARE
 st.header("📋 Runde")
@@ -255,35 +289,19 @@ if are_runde and are_variante:
     
     cols_stats = st.columns(7)
     
+    # Pregătire date pentru Numba
+    variante_arr = np.array([var['numere'] for var in st.session_state.variante], dtype=np.int64)
+    
     for i in range(7):
         with cols_stats[i]:
             if st.session_state.runde_chenare[i]:
-                castiguri_chenar = 0
-                punctaje_chenar = []
-                count_4_4 = 0
-                count_3_4 = 0
-                count_2_4 = 0
+                runde_arr = np.array(st.session_state.runde_chenare[i], dtype=np.int64)
                 
-                for runda in st.session_state.runde_chenare[i]:
-                    for var_obj in st.session_state.variante:
-                        varianta = var_obj['numere']
-                        potriviri = verifica_varianta(varianta, runda)
-                        
-                        if potriviri >= numar_minim:
-                            castiguri_chenar += 1
-                        
-                        punctaj = calculeaza_punctaj(potriviri)
-                        if punctaj > 0:
-                            punctaje_chenar.append(punctaj)
-                            
-                            if potriviri == 4:
-                                count_4_4 += 1
-                            elif potriviri == 3:
-                                count_3_4 += 1
-                            elif potriviri == 2:
-                                count_2_4 += 1
+                castiguri_chenar, count_2_4, count_3_4, count_4_4, punctaje_chenar = calculeaza_statistici_chenar(
+                    variante_arr, runde_arr, numar_minim
+                )
                 
-                medie_punctaj = np.mean(punctaje_chenar) if punctaje_chenar else 0
+                medie_punctaj = np.mean(punctaje_chenar) if len(punctaje_chenar) > 0 else 0
                 coverage = (castiguri_chenar / (len(st.session_state.runde_chenare[i]) * len(st.session_state.variante)) * 100) if castiguri_chenar > 0 else 0
                 
                 st.metric(f"Chenar {i+1}", f"{castiguri_chenar}")
@@ -300,16 +318,8 @@ if are_runde and are_variante:
     with rezultate_container:
         for i in range(7):
             if st.session_state.runde_chenare[i]:
-                castiguri_total = 0
-                
-                for runda in st.session_state.runde_chenare[i]:
-                    for var_obj in st.session_state.variante:
-                        varianta = var_obj['numere']
-                        potriviri = verifica_varianta(varianta, runda)
-                        
-                        if potriviri >= numar_minim:
-                            castiguri_total += 1
-                
+                runde_arr = np.array(st.session_state.runde_chenare[i], dtype=np.int64)
+                castiguri_total, _, _, _, _ = calculeaza_statistici_chenar(variante_arr, runde_arr, numar_minim)
                 st.text(f"Chenarul {i+1} - {castiguri_total} variante câștigătoare")
     
     st.divider()
@@ -317,26 +327,30 @@ if are_runde and are_variante:
     # SECȚIUNEA 2 - TOP 100 STABILITATE
     st.header("💎 Secțiunea 2 - TOP 100 Stabilitate")
     
-    # Calculare punctaje pentru toate variantele
-    @st.cache_data
-    def calculeaza_top_100(_variante, _runde_chenare):
+    # Calculare punctaje pentru toate variantele cu progress bar
+    with st.spinner('Calculare TOP 100...'):
         rezultate = []
         
-        for var_obj in _variante:
+        for var_obj in st.session_state.variante:
             var_id = var_obj['id']
-            varianta = var_obj['numere']
+            varianta = np.array(var_obj['numere'], dtype=np.int64)
             
             punctaje_per_chenar = []
             chenare_active = 0
             punctaj_total = 0
             
             for i in range(7):
+                if not st.session_state.runde_chenare[i]:
+                    punctaje_per_chenar.append(0)
+                    continue
+                    
+                runde_arr = np.array(st.session_state.runde_chenare[i], dtype=np.int64)
                 punctaj_chenar = 0
                 are_potriviri = False
                 
-                for runda in _runde_chenare[i]:
-                    potriviri = verifica_varianta(varianta, runda)
-                    punctaj = calculeaza_punctaj(potriviri)
+                for runda in runde_arr:
+                    potriviri = verifica_varianta_numba(varianta, runda)
+                    punctaj = calculeaza_punctaj_numba(potriviri)
                     punctaj_chenar += punctaj
                     
                     if potriviri >= 2:
@@ -353,19 +367,15 @@ if are_runde and are_variante:
                 
                 rezultate.append({
                     'id': var_id,
-                    'numere': varianta,
+                    'numere': var_obj['numere'],
                     'punctaj_total': punctaj_total,
                     'chenare_active': chenare_active,
                     'sd': sd,
                     'punctaje_per_chenar': punctaje_per_chenar
                 })
         
-        # Sortare: prioritate chenare_active, apoi punctaj_total DESC, apoi sd ASC
-        rezultate_sortate = sorted(rezultate, key=lambda x: (-x['chenare_active'], -x['punctaj_total'], x['sd']))
-        
-        return rezultate_sortate[:100]
-    
-    top_100 = calculeaza_top_100(st.session_state.variante, st.session_state.runde_chenare)
+        # Sortare
+        top_100 = sorted(rezultate, key=lambda x: (-x['chenare_active'], -x['punctaj_total'], x['sd']))[:100]
     
     if top_100:
         # FILTRARE DINAMICĂ
@@ -398,11 +408,10 @@ if are_runde and are_variante:
         st.subheader("🔥 Heatmap Distribuție Punctaj")
         
         if len(top_100_filtrat) > 0:
-            # Pregătire date pentru heatmap
             heatmap_data = []
             labels_y = []
             
-            for idx, item in enumerate(top_100_filtrat[:20], 1):  # Primele 20 pentru vizibilitate
+            for idx, item in enumerate(top_100_filtrat[:20], 1):
                 heatmap_data.append(item['punctaje_per_chenar'])
                 labels_y.append(f"#{idx} ID:{item['id']}")
             
@@ -428,7 +437,6 @@ if are_runde and are_variante:
         tabel_container = st.container(height=400)
         with tabel_container:
             for idx, item in enumerate(top_100_filtrat, 1):
-                # Highlighting
                 badge = ""
                 if item['sd'] < 2.0:
                     badge += "⭐ "
@@ -452,10 +460,9 @@ if are_runde and are_variante:
                 with col_t6:
                     st.text(f"{item['sd']:.2f}")
                 with col_t7:
-                    if st.button("👁️", key=f"detalii_{idx}"):
-                        with st.expander(f"Detalii ID {item['id']}", expanded=True):
-                            for i, punctaj in enumerate(item['punctaje_per_chenar'], 1):
-                                st.text(f"Chenar {i}: {punctaj} puncte")
+                    with st.expander("👁️"):
+                        for i, punctaj in enumerate(item['punctaje_per_chenar'], 1):
+                            st.text(f"Chenar {i}: {punctaj} puncte")
                 
                 if badge:
                     st.caption(badge)
